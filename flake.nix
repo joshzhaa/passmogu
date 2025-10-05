@@ -6,21 +6,23 @@
   };
 
   outputs = { self, nixpkgs }:
-  let
-    pkgs = nixpkgs.legacyPackages.x86_64-linux;
-  in
-  {
-    devShells.x86_64-linux.default = pkgs.mkShell {
-      buildInputs = with pkgs; [
-        cargo
-        rustc
-        rustfmt
-        clippy
-        rust-analyzer
-      ];
+    let
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    in
+    {
+      devShells.x86_64-linux.default = pkgs.mkShell {
+        buildInputs = with pkgs; [
+          cargo
+          rustc
+          rustfmt
+          clippy
+          rust-analyzer
+        ];
 
-      # used by rust-analyzer
-      env.RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+        # used by rust-analyzer
+        env.RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+      };
+
+      formatter.x86_64-linux = pkgs.nixpkgs-fmt;
     };
-  };
 }
