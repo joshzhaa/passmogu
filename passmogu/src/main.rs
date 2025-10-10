@@ -1,17 +1,20 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct Args {
-    #[arg(short, long)]
-    name: String,
-    #[arg(short, long, default_value_t = 1)]
-    count: u8,
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    Show,
+    Save,
 }
 
 fn main() {
-    let args = Args::parse();
-    for _ in 0..args.count {
-        println!("yo {}!", args.name)
-    }
+    let cli = Cli::parse();
+    println!("{cli:?}");
+    println!("Success!");
 }
