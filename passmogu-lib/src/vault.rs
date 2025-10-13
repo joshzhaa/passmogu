@@ -41,7 +41,7 @@ impl Vault {
         let mut vault = Vault(HashMap::new());
         for row in data.split('\n') {
             if row.is_empty() {
-                continue;  // permit empty rows but don't add "" as a key to the map
+                continue; // permit empty rows but don't add "" as a key to the map
             }
             let mut i = row.split('\t');
             // expects name\tprompt\tanswer\tprompt\tanswer...
@@ -49,7 +49,7 @@ impl Vault {
             let mut form = Form::new();
             while let Some(prompt) = i.next() {
                 let answer = i.next()?; // each prompt must be paired with an answer
-                form.push(Field{
+                form.push(Field {
                     prompt: prompt.to_string(),
                     answer: answer.to_string(),
                 });
@@ -90,7 +90,10 @@ mod tests {
         assert_eq!(first_form[0].answer, "AzureDiamond");
         assert_eq!(first_form[1].prompt, "password");
         assert_eq!(first_form[1].answer, "hunter2");
-        assert_eq!(first_form[2].prompt, "What was the name of your best friend in elementary school?");
+        assert_eq!(
+            first_form[2].prompt,
+            "What was the name of your best friend in elementary school?"
+        );
         assert_eq!(first_form[2].answer, "Cthon98");
 
         let second_form = &vault["other website dot com"];
@@ -98,7 +101,10 @@ mod tests {
         assert_eq!(second_form[0].answer, "Cthon98");
         assert_eq!(second_form[1].prompt, "password");
         assert_eq!(second_form[1].answer, "*********");
-        assert_eq!(second_form[2].prompt, "What was the name of your best friend in elementary school?");
+        assert_eq!(
+            second_form[2].prompt,
+            "What was the name of your best friend in elementary school?"
+        );
         assert_eq!(second_form[2].answer, "AzureDiamond");
 
         assert_eq!(Vault::load(&vault.dump()), Vault::load(serialized));
