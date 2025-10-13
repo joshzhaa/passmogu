@@ -2,19 +2,20 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct Cli {
+struct Args {
     #[command(subcommand)]
-    command: Commands,
+    command: Command,
 }
 
 #[derive(Subcommand, Debug)]
-enum Commands {
+enum Command {
     Show,
     Save,
 }
 
 fn main() {
-    let cli = Cli::parse();
-    println!("{cli:?}");
+    let args = Args::parse();
+    println!("{args:?}");
+    println!("{:?}", args.command);
     println!("Success!");
 }

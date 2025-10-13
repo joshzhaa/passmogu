@@ -17,6 +17,7 @@
           rustfmt
           clippy
           rust-analyzer
+          lldb
         ];
 
         # used by rust-analyzer
