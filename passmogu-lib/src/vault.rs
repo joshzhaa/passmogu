@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Keys, HashMap};
+use std::collections::HashMap;
 use std::ops::Index;
 
 /// A field is a pair of prompt and answer e.g. ("password", "hunter2")
@@ -14,7 +14,7 @@ pub struct Field {
 /// Any list of fields consitutes a valid form, so we simply define a type alias here.
 type Form = Box<[Field]>;
 
-/// Vault maps form_name -> form_fields and mostly conforms to a subset of HashMap's API.
+/// Vault maps form_name -> form and mostly mirrors a subset of HashMap's API.
 /// It's serializable to and from plaintext strings in a tsv format
 /// (which obviously disallows including \t in any fields).
 /// The format is "form_name\tprompt1\tanswer1\tprompt2\tanswer2\n". The empty Vault is "" (not "\n").
@@ -39,7 +39,7 @@ impl Vault {
         table.into_boxed_str()
     }
 
-    /// Deserializes data from plaintext into Vault. Can only fail if string is misformatted.
+    /// Deserializes data from plaintext into Vault. Can only fail if string is malformed.
     pub fn load(data: &str) -> Option<Self> {
         let mut vault = Self(HashMap::new());
         for row in data.split('\n') {
@@ -62,14 +62,22 @@ impl Vault {
         Some(vault)
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     /// Returns Some &Form if form identified by name is present, None otherwise.
     pub fn get(&self, name: &str) -> Option<&Form> {
         self.0.get(name)
     }
 
     /// Returns names of forms currently stored in Vault
-    pub fn form_names(&self) -> Keys<'_, Box<str>, Box<[Field]>> {
-        self.0.keys()
+    pub fn form_names(&self) -> Keys<'_> {
+        Keys(self.0.keys())
     }
 
     /// Writes or overwrites Vault\[name\]. The burden is on the caller to construct a Form.
@@ -79,7 +87,7 @@ impl Vault {
     }
 
     /// Deletes a form in the Vault.
-    /// Returns value which was removed, None if key wasn't in this Vault.
+    /// Returns value which was removed, None if key wasn't in Vault.
     pub fn remove(&mut self, name: &str) -> Option<Form> {
         self.0.remove(name)
     }
@@ -93,6 +101,20 @@ impl Index<&str> for Vault {
     }
 }
 
+/// vault::Keys Iterator adapts hash_map::Iter by auto deref-ing the Box into &str
+pub struct Keys<'a>(std::collections::hash_map::Keys<'a, Box<str>, Form>);
+
+impl<'a> Iterator for Keys<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.0.next() {
+            Some(ptr) => Some(&**ptr),
+            None => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -101,21 +123,22 @@ mod tests {
     fn serialize_empty_vault() {
         let empty = "";
         let vault = Vault::load(empty).unwrap();
-        assert_eq!(vault.0.len(), 0);
+        assert!(vault.is_empty());
         assert_eq!(*vault.dump(), *empty);
 
         let tabs = "\t\t\t\t\n";
         let vault = Vault::load(tabs).unwrap();
         println!("{:?}", vault);
-        assert_eq!(vault.0.len(), 0);
+        assert!(vault.is_empty());
         assert_eq!(*vault.dump(), *empty);
 
         let newlines = "\n\n\n\n\n";
         let vault = Vault::load(newlines).unwrap();
-        assert_eq!(vault.0.len(), 0);
+        assert!(vault.is_empty());
         assert_eq!(*vault.dump(), *empty);
 
         let devault = Vault::default();
+        assert!(vault.is_empty());
         assert_eq!(*devault.dump(), *empty);
     }
 
@@ -124,10 +147,12 @@ mod tests {
         let serialized = "irc\tusername\tAzureDiamond\tpassword\thunter2\tWho's your best friend?\tCthon98\nother website dot com\tusername\tCthon98\tpassword\t*********\tWho's your best friend?\tAzureDiamond\n";
         let vault = Vault::load(serialized).unwrap();
 
-        let names = vault.form_names();
-        for name in vault.form_names() {
-            assert!(**name == *"irc" || **name == *"other website dot com");
+        let mut names = vault.form_names();
+        for _ in 0..vault.len() {
+            let name = names.next().unwrap();
+            assert!(name == "irc" || name == "other website dot com");
         }
+        assert_eq!(names.next(), None);
 
         let first_form = &vault["irc"];
         assert_eq!(*first_form[0].prompt, *"username");
@@ -155,7 +180,7 @@ mod tests {
     #[test]
     fn modify_vault() {
         let mut vault = Vault::default();
-        assert_eq!(vault.0.len(), 0);
+        assert!(vault.is_empty());
 
         let generic_username = Field {
             prompt: "username".into(),
@@ -171,7 +196,7 @@ mod tests {
             [generic_username.clone(), bad_password.clone()].into(),
         );
 
-        assert_eq!(vault.0.len(), 1);
+        assert_eq!(vault.len(), 1);
         assert_eq!(vault.get("form name that wasn't inserted"), None);
 
         let form = vault.get("asdf").unwrap();
@@ -185,6 +210,6 @@ mod tests {
         assert_eq!(form[1], bad_password);
 
         vault.remove("asdf");
-        assert_eq!(vault.0.len(), 0);
+        assert!(vault.is_empty());
     }
 }
