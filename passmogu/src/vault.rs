@@ -15,9 +15,9 @@ pub struct Field {
 type Form = Box<[Field]>;
 
 /// Vault maps form_name -> form and mostly mirrors a subset of HashMap's API.
-/// It's serializable to and from plaintext strings in a tsv format
-/// (which obviously disallows including \t in any fields).
+/// It's serializable to and from plaintext strings in a tsv format using dump and load.
 /// The format is "form_name\tprompt1\tanswer1\tprompt2\tanswer2\n". The empty Vault is "" (not "\n").
+/// Because of the tsv format, "\t" is disallowed in all fields. You probably didn't want it anyway.
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct Vault(HashMap<Box<str>, Form>);
 
@@ -76,7 +76,7 @@ impl Vault {
     }
 
     /// Returns names of forms currently stored in Vault
-    pub fn form_names(&self) -> Keys<'_> {
+    pub fn form_names(&self) -> impl Iterator<Item = &str> {
         Keys(self.0.keys())
     }
 
@@ -201,7 +201,6 @@ mod tests {
 
         let form = vault.get("asdf").unwrap();
         for field in form {
-            println!("{}: {}", field.prompt, field.answer);
             assert!(field.prompt == generic_username.prompt || field.prompt == bad_password.prompt);
             assert!(field.answer == generic_username.answer || field.answer == bad_password.answer);
         }
