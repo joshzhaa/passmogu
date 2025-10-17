@@ -1,5 +1,10 @@
-// mod vault provides an interface for storing login form data in plaintext
+// interface for storing login form data in plaintext
 pub mod vault;
 
-// mod crypto provides an interface for password based encryption and decryption
-pub mod crypto;
+// password based encryption
+pub mod encrypt;
+
+// password generation
+pub mod generate;
+
+pub mod error;
