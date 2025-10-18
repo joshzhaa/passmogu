@@ -6,5 +6,3 @@ pub mod encrypt;
 
 // password generation
 pub mod generate;
-
-pub mod error;
