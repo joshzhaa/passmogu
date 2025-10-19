@@ -1,40 +1,49 @@
 use aws_lc_rs::{error, rand};
+use zeroize::Zeroizing;
+
+pub fn rand_xkcd(_len: usize, _dictionary: &[&str]) -> Result<String, error::Unspecified> {
+    todo!()
+}
+
+/// Generate a random base62 String (A-Z, a-z, 0-9)
+/// Resulting chars in String are uniformly distributed in the base62 alphabet
+pub fn rand_base62(len: usize) -> Result<Zeroizing<Box<[u8]>>, error::Unspecified> {
+    const ALPHABET: [u8; 62] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D', b'E',
+        b'F', b'G', b'H', b'I', b'J', b'K', b'L', b'M', b'N', b'O', b'P', b'Q', b'R', b'S', b'T',
+        b'U', b'V', b'W', b'X', b'Y', b'Z', b'a', b'b', b'c', b'd', b'e', b'f', b'g', b'h', b'i',
+        b'j', b'k', b'l', b'm', b'n', b'o', b'p', b'q', b'r', b's', b't', b'u', b'v', b'w', b'x',
+        b'y', b'z',
+    ];
+
+    let mut result = Zeroizing::new(vec![0_u8; len].into_boxed_slice());
+    let mut write_head = 0;
+
+    const CHUNK_SIZE: usize = 128; // we'll populate result CHUNK_SIZE bytes at a time
+    let mut random_bytes = Zeroizing::new([0_u8; CHUNK_SIZE]);
+
+    loop {
+        // refresh with another chunk of random bytes
+        rand::fill(&mut *random_bytes)?;
+        // encode into base62 by indexing into ALPHABET
+        for byte in *random_bytes {
+            let index = usize::from(byte);
+            // filter so that first elements of ALPHABET aren't statistically more likely in result
+            if index >= greatest_multiple(ALPHABET.len(), u8::MAX as usize) {
+                continue;
+            }
+            result[write_head] = ALPHABET[index % 62];
+            write_head += 1;
+            if write_head == len {
+                return Ok(result);
+            }
+        }
+    }
+}
 
 /// greatest multiple of 'number' strictly less then 'upper_limit'
 const fn greatest_multiple(number: usize, upper_limit: usize) -> usize {
     ((upper_limit - 1) / number) * number
-}
-
-pub fn rand_base62(len: usize) -> Result<String, error::Unspecified> {
-    const ALPHABET_LEN: usize = 62;
-    static ALPHABET: [char; ALPHABET_LEN] = [
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-        'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
-        's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    ];
-
-    let mut result = String::new();
-    result.reserve(len);
-
-    const CHUNK_SIZE: usize = 128;
-    let mut random_bytes = [0_u8; CHUNK_SIZE];
-
-    loop {
-        // refresh with another chunk of random bytes
-        rand::fill(&mut random_bytes)?;
-        // encode into base62 by indexing into ALPHABET
-        for byte in random_bytes {
-            // filter so that first elements of ALPHABET aren't statisitcally more likely in result
-            let index = usize::from(byte);
-            if index < greatest_multiple(ALPHABET_LEN, u8::MAX as usize) {
-                result.push(ALPHABET[index % 62]);
-                if result.len() == len {
-                    return Ok(result);
-                }
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -46,26 +55,26 @@ mod tests {
     fn basic_base62() {
         let small = rand_base62(1).unwrap();
         assert_eq!(small.len(), 1);
-        println!("small: {small}");
+        println!("small: {}", str::from_utf8(&small).unwrap());
 
         let medium = rand_base62(64).unwrap();
         assert_eq!(medium.len(), 64);
-        println!("medium: {medium}");
+        println!("medium: {}", str::from_utf8(&medium).unwrap());
 
         let large = rand_base62(1024).unwrap();
         assert_eq!(large.len(), 1024);
-        println!("large: {large}");
+        println!("large: {}", str::from_utf8(&large).unwrap());
     }
 
     #[test]
-    /// this test takes a second
-    fn base62_char_stats() {
-        let mut counts: HashMap<char, usize> = HashMap::new();
+    /// detects statistical bias in string gen
+    fn base62_char_distribution() {
+        let mut counts: HashMap<u8, usize> = HashMap::new();
         let mut total = 0;
         for _ in 0..50 {
-            let string = rand_base62(100000).unwrap();
-            for c in string.chars() {
-                *counts.entry(c).or_default() += 1;
+            let string = rand_base62(10000).unwrap();
+            for c in string.iter() {
+                *counts.entry(*c).or_default() += 1;
                 total += 1;
             }
         }
