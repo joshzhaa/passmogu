@@ -6,3 +6,5 @@ pub mod encrypt;
 
 // password generation
 pub mod generate;
+
+pub mod safe_string;
