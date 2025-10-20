@@ -1,6 +1,6 @@
+use crate::safe_string::SafeString;
 use aws_lc_rs::rand;
 use zeroize::Zeroizing;
-use crate::safe_string::SafeString;
 
 pub fn rand_xkcd(_len: usize, _dictionary: &[&str]) -> Option<SafeString> {
     todo!()

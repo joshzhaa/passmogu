@@ -1,3 +1,4 @@
+use crate::safe_string::SafeString;
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -5,37 +6,42 @@ use std::ops::Index;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field {
     /// e.g. "username", "password", "What's your mother's maiden name?"
-    prompt: Box<[u8]>,
+    prompt: SafeString,
     /// value to populate into field
-    answer: Box<[u8]>,
+    answer: SafeString,
 }
 
 /// A form is nothing more than a collection of fields to populate.
 /// Any list of fields consitutes a valid form, so we simply define a type alias here.
-type Form = Box<[Field]>;
+pub type Form = Box<[Field]>;
 
 /// Vault maps form_name -> form and mostly mirrors a subset of HashMap's API.
 /// It's serializable to and from tsv. The format is "form_name\tprompt1\tanswer1\tprompt2\tanswer2\n".
 /// The empty Vault is "" (not "\n"). Because of the tsv format, "\t" is disallowed in all fields.
 #[derive(Debug, PartialEq, Eq, Default)]
-pub struct Vault(HashMap<Box<[u8]>, Form>);
+pub struct Vault(HashMap<Box<[u8]>, Form>); // memory protections for form_name are not as strong.
 
 impl Vault {
+    // Creates empty vault.
+    pub fn new() -> Vault {
+        Vault::default()
+    }
+
     /// Serializes vault into tsv.
-    pub fn dump(&self) -> Box<[u8]> {
+    pub fn dump(&self) -> SafeString {
         // Could also parse twice to allocate the right size, then to populate, but it's easier this way.
         let mut table: Vec<u8> = Vec::new();
         for (name, form) in &self.0 {
             table.extend(name);
             for field in form.iter() {
                 table.push(b'\t');
-                table.extend(&field.prompt);
+                table.extend(&*field.prompt);
                 table.push(b'\t');
-                table.extend(&field.answer);
+                table.extend(&*field.answer);
             }
             table.push(b'\n');
         }
-        table.into_boxed_slice()
+        SafeString::new(table.into_boxed_slice())
     }
 
     /// Deserializes data from tsv into Vault. Can only fail if string is malformed.
@@ -49,14 +55,14 @@ impl Vault {
             while let Some(prompt) = i.next() {
                 let answer = i.next()?; // each prompt must be paired with an answer
                 form.push(Field {
-                    prompt: Box::from(prompt),
-                    answer: Box::from(answer),
+                    prompt: SafeString::new(Box::from(prompt)),
+                    answer: SafeString::new(Box::from(answer)),
                 });
             }
             if name.is_empty() {
                 continue; // permit empty rows but don't add "" as a key to the map
             }
-            vault.insert(Box::from(name), form.into_boxed_slice());
+            vault.insert(name, form.into_boxed_slice());
         }
         Some(vault)
     }
@@ -81,8 +87,8 @@ impl Vault {
 
     /// Writes or overwrites Vault\[name\]. The burden is on the caller to construct a Form.
     /// Returns None when no key was overwritten. Returns Some when a key was overwritten.
-    pub fn insert(&mut self, name: Box<[u8]>, form: Form) -> Option<Form> {
-        self.0.insert(name, form)
+    pub fn insert(&mut self, name: &[u8], form: Form) -> Option<Form> {
+        self.0.insert(Box::from(name), form)
     }
 
     /// Deletes a form in the Vault.
@@ -123,21 +129,21 @@ mod tests {
         let empty = b"";
         let vault = Vault::load(empty).unwrap();
         assert!(vault.is_empty());
-        assert_eq!(*vault.dump(), *empty);
+        assert_eq!(&**vault.dump(), empty);
 
         let tabs = b"\t\t\t\t\n";
         let vault = Vault::load(tabs).unwrap();
         assert!(vault.is_empty());
-        assert_eq!(*vault.dump(), *empty);
+        assert_eq!(&**vault.dump(), empty);
 
         let newlines = b"\n\n\n\n\n";
         let vault = Vault::load(newlines).unwrap();
         assert!(vault.is_empty());
-        assert_eq!(*vault.dump(), *empty);
+        assert_eq!(&**vault.dump(), empty);
 
         let devault = Vault::default();
         assert!(vault.is_empty());
-        assert_eq!(*devault.dump(), *empty);
+        assert_eq!(&**devault.dump(), empty);
     }
 
     #[test]
@@ -153,20 +159,20 @@ mod tests {
         assert_eq!(names.next(), None);
 
         let first_form = &vault[b"irc"];
-        assert_eq!(*first_form[0].prompt, *b"username");
-        assert_eq!(*first_form[0].answer, *b"AzureDiamond");
-        assert_eq!(*first_form[1].prompt, *b"password");
-        assert_eq!(*first_form[1].answer, *b"hunter2");
-        assert_eq!(*first_form[2].prompt, *b"Who's your best friend?");
-        assert_eq!(*first_form[2].answer, *b"Cthon98");
+        assert_eq!(&**first_form[0].prompt, b"username");
+        assert_eq!(&**first_form[0].answer, b"AzureDiamond");
+        assert_eq!(&**first_form[1].prompt, b"password");
+        assert_eq!(&**first_form[1].answer, b"hunter2");
+        assert_eq!(&**first_form[2].prompt, b"Who's your best friend?");
+        assert_eq!(&**first_form[2].answer, b"Cthon98");
 
         let second_form = &vault[b"other website dot com"];
-        assert_eq!(*second_form[0].prompt, *b"username");
-        assert_eq!(*second_form[0].answer, *b"Cthon98");
-        assert_eq!(*second_form[1].prompt, *b"password");
-        assert_eq!(*second_form[1].answer, *b"*********");
-        assert_eq!(*second_form[2].prompt, *b"Who's your best friend?");
-        assert_eq!(*second_form[2].answer, *b"AzureDiamond");
+        assert_eq!(&**second_form[0].prompt, b"username");
+        assert_eq!(&**second_form[0].answer, b"Cthon98");
+        assert_eq!(&**second_form[1].prompt, b"password");
+        assert_eq!(&**second_form[1].answer, b"*********");
+        assert_eq!(&**second_form[2].prompt, b"Who's your best friend?");
+        assert_eq!(&**second_form[2].answer, b"AzureDiamond");
 
         // best friends
         assert_eq!(first_form[0].answer, second_form[2].answer);
@@ -181,16 +187,16 @@ mod tests {
         assert!(vault.is_empty());
 
         let generic_username = Field {
-            prompt: Box::from(*b"username"),
-            answer: Box::from(*b"user1@example.test"),
+            prompt: SafeString::new(Box::from(*b"username")),
+            answer: SafeString::new(Box::from(*b"user1@example.test")),
         };
 
         let bad_password = Field {
-            prompt: Box::from(*b"password"),
-            answer: Box::from(*b"password1"),
+            prompt: SafeString::new(Box::from(*b"password")),
+            answer: SafeString::new(Box::from(*b"password1")),
         };
         vault.insert(
-            Box::from(*b"asdf"),
+            b"asdf",
             [generic_username.clone(), bad_password.clone()].into(),
         );
 
