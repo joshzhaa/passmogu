@@ -6,9 +6,9 @@ use std::ops::Index;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field {
     /// e.g. "username", "password", "What's your mother's maiden name?"
-    prompt: Secret,
+    pub prompt: Secret,
     /// value to populate into field
-    answer: Secret,
+    pub answer: Secret,
 }
 
 /// A form is nothing more than a collection of fields to populate.

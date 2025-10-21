@@ -7,3 +7,4 @@ into memory.
 
 ## Todo
 There's a bug when encrypted data includes '\t'. It conflicts with the separator.
+  - hex encode encrypted data so that encoded data cannot include '\t'

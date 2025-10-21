@@ -1,4 +1,7 @@
-use std::{ops::Index, ops::IndexMut, slice::SliceIndex};
+use std::{
+    ops::{Index, IndexMut},
+    slice::SliceIndex,
+};
 use zeroize::Zeroizing;
 
 /// Secret zeroizes the heap allocated u8 slice when dropped. We're only supporting ASCII,
@@ -10,7 +13,7 @@ pub struct Secret {
 }
 
 impl Secret {
-    // initializes Secret, all zeroes
+    /// initializes Secret, all zeroes
     pub fn zero(len: usize) -> Self {
         Secret {
             data: Zeroizing::new(vec![0_u8; len].into_boxed_slice()),
@@ -37,6 +40,15 @@ impl Secret {
 
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
+    }
+
+    /// Creates new, shorter Secret with first len elements from self
+    pub fn truncate(&self, len: usize) -> Self {
+        let mut shorter = Self::zero(len);
+        for i in 0..len {
+            shorter[i] = self[i];
+        }
+        shorter
     }
 }
 

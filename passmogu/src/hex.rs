@@ -2,7 +2,7 @@ use crate::secret::Secret;
 
 // Valid hex string with invariants:
 // 1. len() % 2 == 0
-// 2. Hex[i].is_ascii_digit() || Hex[i].is_ascii_uppercase()
+// 2. Hex[i].is_ascii_digit() || (b'A'..=b'F').contains(&Hex[i])
 pub struct Hex {
     str: Secret,
 }
@@ -12,12 +12,11 @@ impl Hex {
     /// infallible because all byte sequences can be represented as hex.
     pub fn encode(bytes: &[u8]) -> Hex {
         let byte_to_hex = |x: u8| {
-            if x < 10 { b'0' + x } else { b'A' + x }
+            if x < 10 { b'0' + x } else { b'A' + x - 10 }
         };
 
         let mut hex = Secret::zero(bytes.len() * 2);
         let mut i = 0;
-
         for byte in bytes {
             let upper = *byte >> 4;
             let lower = *byte & 15;
@@ -31,19 +30,18 @@ impl Hex {
     /// decode hex string into raw bytes.
     /// asserts check invariants of Hex struct.
     pub fn decode(&self) -> Secret {
-        assert_eq!(self.str.len() % 2, 0);
+        debug_assert_eq!(self.str.len() % 2, 0);
 
         let hex_to_byte = |x: u8| {
             if x.is_ascii_digit() {
                 x - b'0'
             } else {
-                assert!(x.is_ascii_uppercase());
-                x - b'A'
+                debug_assert!((b'A'..=b'F').contains(&x));
+                x - b'A' + 10
             }
         };
 
         let mut bytes = Secret::zero(self.str.len() / 2);
-
         for (i, chunk) in self.str.expose().chunks_exact(2).enumerate() {
             let lower = hex_to_byte(chunk[0]);
             let upper = hex_to_byte(chunk[1]);

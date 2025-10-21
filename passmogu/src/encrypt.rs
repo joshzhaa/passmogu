@@ -1,7 +1,7 @@
+use crate::secret::Secret;
 use aws_lc_rs::{aead, pbkdf2};
 use std::num::NonZeroU32;
-
-use crate::secret::Secret;
+use zeroize::Zeroizing;
 
 /// We can afford the performance penalty of SIV, still don't reuse nonces.
 const ALGORITHM: &aead::Algorithm = &aead::AES_256_GCM_SIV;
@@ -22,9 +22,9 @@ pub fn derive_key(password: &[u8], salt: &[u8]) -> Secret {
     result
 }
 
-/// Returns encrypted ciphertext and the nonce necessary to decrypt it.
+/// Returns encrypted concatenated(nonce, ciphertext, tag)
 /// Even though what's returned is ciphertext, it doesn't cost us much to zero it out anyway.
-pub fn encrypt(mut plaintext: Secret, key: &[u8]) -> Option<(Secret, aead::Nonce)> {
+pub fn encrypt(mut plaintext: Secret, key: &[u8]) -> Option<Secret> {
     let aead_key = aead::RandomizedNonceKey::new(ALGORITHM, key).ok()?;
 
     let (nonce, tag) = aead_key
@@ -33,28 +33,42 @@ pub fn encrypt(mut plaintext: Secret, key: &[u8]) -> Option<(Secret, aead::Nonce
     // at this point "plaintext" contains the ciphertext (eww aws_lc_rs uses out parameters)
     let ciphertext = &plaintext;
 
-    let result_len = ciphertext.len() + ALGORITHM.tag_len();
+    let nonce = nonce.as_ref();
+    let result_len = ciphertext.len() + ALGORITHM.tag_len() + aead::NONCE_LEN;
     let mut result = Secret::zero(result_len);
     // there might be a more idiomatic way to concat arrays in this language w/o unhygienically
     // reallocating everything and leaving copies everywhere on the heap.
+    for i in 0..aead::NONCE_LEN {
+        result[i] = nonce[i];
+    }
     for i in 0..ciphertext.len() {
-        result[i] = ciphertext[i];
+        result[i + aead::NONCE_LEN] = ciphertext[i];
     }
-    for i in ciphertext.len()..result_len {
-        result[i] = tag.as_ref()[i - ciphertext.len()];
+    for i in 0..ALGORITHM.tag_len() {
+        result[i + aead::NONCE_LEN + ciphertext.len()] = tag.as_ref()[i];
     }
-    Some((result, nonce))
+    Some(result)
 }
 
 /// Decrypts ciphertext into plaintext.
-pub fn decrypt(mut ciphertext: Secret, key: &[u8], nonce: aead::Nonce) -> Option<Secret> {
+pub fn decrypt(mut ciphertext: Secret, key: &[u8]) -> Option<Secret> {
     let aead_key = aead::RandomizedNonceKey::new(&aead::AES_256_GCM_SIV, key).ok()?;
 
+    let nonce = slice_to_nonce(&ciphertext[0..aead::NONCE_LEN]);
+    let len = ciphertext.len();
+    let ciphertext = &mut ciphertext.expose_mut()[aead::NONCE_LEN..len];
+
     let plaintext = aead_key
-        .open_in_place(nonce, aead::Aad::empty(), ciphertext.expose_mut())
+        .open_in_place(nonce, aead::Aad::empty(), ciphertext)
         .ok()?;
 
     Some(Secret::new(Box::from(plaintext)))
+}
+
+fn slice_to_nonce(slice: &[u8]) -> aead::Nonce {
+    let mut buffer = Zeroizing::new([0_u8; aead::NONCE_LEN]);
+    buffer.copy_from_slice(slice);
+    (&*buffer).into()
 }
 
 #[cfg(test)]
@@ -74,9 +88,9 @@ mod tests {
         let message =
             Secret::new((*b"I set my ATM card's number to '0001' because I'm number one!").into());
         println!("message = {}", str::from_utf8(message.expose()).unwrap());
-        let (ciphertext, nonce) = encrypt(message.clone(), key.expose()).unwrap();
+        let ciphertext = encrypt(message.clone(), key.expose()).unwrap();
         println!("ciphertext = {ciphertext:?}");
-        let decoded = decrypt(ciphertext, key.expose(), nonce).unwrap();
+        let decoded = decrypt(ciphertext, key.expose()).unwrap();
         println!("plaintext = {}", str::from_utf8(decoded.expose()).unwrap());
         assert_eq!(message, decoded);
     }
