@@ -1,4 +1,4 @@
-use crate::safe_string::SafeString;
+use crate::secret::Secret;
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -6,9 +6,9 @@ use std::ops::Index;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field {
     /// e.g. "username", "password", "What's your mother's maiden name?"
-    prompt: SafeString,
+    prompt: Secret,
     /// value to populate into field
-    answer: SafeString,
+    answer: Secret,
 }
 
 /// A form is nothing more than a collection of fields to populate.
@@ -28,20 +28,21 @@ impl Vault {
     }
 
     /// Serializes vault into tsv.
-    pub fn dump(&self) -> SafeString {
+    /// The dumped string isn't a Secret, it's persisted on the filesystem anyway.
+    pub fn dump(&self) -> Box<[u8]> {
         // Could also parse twice to allocate the right size, then to populate, but it's easier this way.
         let mut table: Vec<u8> = Vec::new();
         for (name, form) in &self.0 {
             table.extend(name);
             for field in form.iter() {
                 table.push(b'\t');
-                table.extend(&*field.prompt);
+                table.extend(field.prompt.expose());
                 table.push(b'\t');
-                table.extend(&*field.answer);
+                table.extend(field.answer.expose());
             }
             table.push(b'\n');
         }
-        SafeString::new(table.into_boxed_slice())
+        table.into_boxed_slice()
     }
 
     /// Deserializes data from tsv into Vault. Can only fail if string is malformed.
@@ -55,8 +56,8 @@ impl Vault {
             while let Some(prompt) = i.next() {
                 let answer = i.next()?; // each prompt must be paired with an answer
                 form.push(Field {
-                    prompt: SafeString::new(Box::from(prompt)),
-                    answer: SafeString::new(Box::from(answer)),
+                    prompt: Secret::new(Box::from(prompt)),
+                    answer: Secret::new(Box::from(answer)),
                 });
             }
             if name.is_empty() {
@@ -129,21 +130,21 @@ mod tests {
         let empty = b"";
         let vault = Vault::load(empty).unwrap();
         assert!(vault.is_empty());
-        assert_eq!(&**vault.dump(), empty);
+        assert_eq!(&*vault.dump(), empty);
 
         let tabs = b"\t\t\t\t\n";
         let vault = Vault::load(tabs).unwrap();
         assert!(vault.is_empty());
-        assert_eq!(&**vault.dump(), empty);
+        assert_eq!(&*vault.dump(), empty);
 
         let newlines = b"\n\n\n\n\n";
         let vault = Vault::load(newlines).unwrap();
         assert!(vault.is_empty());
-        assert_eq!(&**vault.dump(), empty);
+        assert_eq!(&*vault.dump(), empty);
 
         let devault = Vault::default();
         assert!(vault.is_empty());
-        assert_eq!(&**devault.dump(), empty);
+        assert_eq!(&*devault.dump(), empty);
     }
 
     #[test]
@@ -159,20 +160,20 @@ mod tests {
         assert_eq!(names.next(), None);
 
         let first_form = &vault[b"irc"];
-        assert_eq!(&**first_form[0].prompt, b"username");
-        assert_eq!(&**first_form[0].answer, b"AzureDiamond");
-        assert_eq!(&**first_form[1].prompt, b"password");
-        assert_eq!(&**first_form[1].answer, b"hunter2");
-        assert_eq!(&**first_form[2].prompt, b"Who's your best friend?");
-        assert_eq!(&**first_form[2].answer, b"Cthon98");
+        assert_eq!(first_form[0].prompt.expose(), b"username");
+        assert_eq!(first_form[0].answer.expose(), b"AzureDiamond");
+        assert_eq!(first_form[1].prompt.expose(), b"password");
+        assert_eq!(first_form[1].answer.expose(), b"hunter2");
+        assert_eq!(first_form[2].prompt.expose(), b"Who's your best friend?");
+        assert_eq!(first_form[2].answer.expose(), b"Cthon98");
 
         let second_form = &vault[b"other website dot com"];
-        assert_eq!(&**second_form[0].prompt, b"username");
-        assert_eq!(&**second_form[0].answer, b"Cthon98");
-        assert_eq!(&**second_form[1].prompt, b"password");
-        assert_eq!(&**second_form[1].answer, b"*********");
-        assert_eq!(&**second_form[2].prompt, b"Who's your best friend?");
-        assert_eq!(&**second_form[2].answer, b"AzureDiamond");
+        assert_eq!(second_form[0].prompt.expose(), b"username");
+        assert_eq!(second_form[0].answer.expose(), b"Cthon98");
+        assert_eq!(second_form[1].prompt.expose(), b"password");
+        assert_eq!(second_form[1].answer.expose(), b"*********");
+        assert_eq!(second_form[2].prompt.expose(), b"Who's your best friend?");
+        assert_eq!(second_form[2].answer.expose(), b"AzureDiamond");
 
         // best friends
         assert_eq!(first_form[0].answer, second_form[2].answer);
@@ -187,13 +188,13 @@ mod tests {
         assert!(vault.is_empty());
 
         let generic_username = Field {
-            prompt: SafeString::new(Box::from(*b"username")),
-            answer: SafeString::new(Box::from(*b"user1@example.test")),
+            prompt: Secret::new(Box::from(*b"username")),
+            answer: Secret::new(Box::from(*b"user1@example.test")),
         };
 
         let bad_password = Field {
-            prompt: SafeString::new(Box::from(*b"password")),
-            answer: SafeString::new(Box::from(*b"password1")),
+            prompt: Secret::new(Box::from(*b"password")),
+            answer: Secret::new(Box::from(*b"password1")),
         };
         vault.insert(
             b"asdf",

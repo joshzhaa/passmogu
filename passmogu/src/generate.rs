@@ -1,14 +1,14 @@
-use crate::safe_string::SafeString;
 use aws_lc_rs::rand;
-use zeroize::Zeroizing;
 
-pub fn rand_xkcd(_len: usize, _dictionary: &[&str]) -> Option<SafeString> {
+use crate::secret::Secret;
+
+pub fn rand_xkcd(_len: usize, _dictionary: &[&str]) -> Option<Secret> {
     todo!()
 }
 
 /// Generate a random base62 String (A-Z, a-z, 0-9)
 /// Resulting chars in String are uniformly distributed in the base62 alphabet
-pub fn rand_base62(len: usize) -> Option<SafeString> {
+pub fn rand_base62(len: usize) -> Option<Secret> {
     const ALPHABET: [u8; 62] = [
         b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D', b'E',
         b'F', b'G', b'H', b'I', b'J', b'K', b'L', b'M', b'N', b'O', b'P', b'Q', b'R', b'S', b'T',
@@ -17,18 +17,18 @@ pub fn rand_base62(len: usize) -> Option<SafeString> {
         b'y', b'z',
     ];
 
-    let mut result = Zeroizing::new(vec![0_u8; len].into_boxed_slice());
+    let mut result = Secret::zero(len);
     let mut write_head = 0;
 
     const CHUNK_SIZE: usize = 128; // we'll populate result CHUNK_SIZE bytes at a time
-    let mut random_bytes = Zeroizing::new([0_u8; CHUNK_SIZE]);
+    let mut random_bytes = Secret::zero(CHUNK_SIZE);
 
     loop {
         // refresh with another chunk of random bytes
-        rand::fill(&mut *random_bytes).ok()?;
+        rand::fill(random_bytes.expose_mut()).ok()?;
         // encode into base62 by indexing into ALPHABET
-        for byte in *random_bytes {
-            let index = usize::from(byte);
+        for byte in random_bytes.expose() {
+            let index = usize::from(*byte);
             // filter so that first elements of ALPHABET aren't statistically more likely in result
             if index >= greatest_multiple(ALPHABET.len(), u8::MAX as usize) {
                 continue;
@@ -56,15 +56,15 @@ mod tests {
     fn basic_base62() {
         let small = rand_base62(1).unwrap();
         assert_eq!(small.len(), 1);
-        println!("small: {}", str::from_utf8(&small).unwrap());
+        println!("small: {}", str::from_utf8(small.expose()).unwrap());
 
         let medium = rand_base62(64).unwrap();
         assert_eq!(medium.len(), 64);
-        println!("medium: {}", str::from_utf8(&medium).unwrap());
+        println!("medium: {}", str::from_utf8(medium.expose()).unwrap());
 
         let large = rand_base62(1024).unwrap();
         assert_eq!(large.len(), 1024);
-        println!("large: {}", str::from_utf8(&large).unwrap());
+        println!("large: {}", str::from_utf8(large.expose()).unwrap());
     }
 
     #[test]
@@ -74,7 +74,7 @@ mod tests {
         let mut total = 0;
         for _ in 0..50 {
             let string = rand_base62(10000).unwrap();
-            for c in string.iter() {
+            for c in string.expose().iter() {
                 *counts.entry(*c).or_default() += 1;
                 total += 1;
             }

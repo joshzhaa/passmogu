@@ -4,7 +4,7 @@ pub mod vault;
 pub mod encrypt;
 // password generation
 pub mod generate;
-
-// miscellaneous utilities
+// hex enc/dec
 pub mod hex;
-pub mod safe_string;
+// zeroizing string type
+pub mod secret;
