@@ -2,9 +2,9 @@ use aws_lc_rs::rand;
 
 use crate::secret::Secret;
 
-pub fn rand_xkcd(_len: usize, _dictionary: &[&str]) -> Option<Secret> {
-    todo!()
-}
+// pub fn rand_xkcd(_len: usize, _dictionary: &[&str]) -> Option<Secret> {
+//     todo!()
+// }
 
 /// Generate a random base62 String (A-Z, a-z, 0-9)
 /// Resulting chars in String are uniformly distributed in the base62 alphabet

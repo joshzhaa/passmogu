@@ -26,12 +26,12 @@ impl Vault {
     pub fn new() -> Vault {
         Vault::default()
     }
-
     /// Serializes vault into tsv.
     /// The dumped string isn't a Secret, it's persisted on the filesystem anyway.
     pub fn dump(&self) -> Box<[u8]> {
         // Could also parse twice to allocate the right size, then to populate, but it's easier this way.
         let mut table: Vec<u8> = Vec::new();
+        // TODO: implement hex encoding here
         for (name, form) in &self.0 {
             table.extend(name);
             for field in form.iter() {

@@ -41,15 +41,6 @@ impl Secret {
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
-
-    /// Creates new, shorter Secret with first len elements from self
-    pub fn truncate(&self, len: usize) -> Self {
-        let mut shorter = Self::zero(len);
-        for i in 0..len {
-            shorter[i] = self[i];
-        }
-        shorter
-    }
 }
 
 impl<I: SliceIndex<[u8]>> Index<I> for Secret {

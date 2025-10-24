@@ -22,7 +22,7 @@ pub fn derive_key(password: &[u8], salt: &[u8]) -> Secret {
     result
 }
 
-/// Returns encrypted concatenated(nonce, ciphertext, tag)
+/// Encrypts plaintext into (nonce, ciphertext, tag) concatenated in a Secret.
 /// Even though what's returned is ciphertext, it doesn't cost us much to zero it out anyway.
 pub fn encrypt(mut plaintext: Secret, key: &[u8]) -> Option<Secret> {
     let aead_key = aead::RandomizedNonceKey::new(ALGORITHM, key).ok()?;
@@ -52,8 +52,9 @@ pub fn encrypt(mut plaintext: Secret, key: &[u8]) -> Option<Secret> {
 
 /// Decrypts ciphertext into plaintext.
 /// If you decrypt plaintext, there's a good chance of panic at runtime.
-/// TODO: determine whetehr we can use type state pattern here to prevent that.
+/// TODO: determine whether we can use type state pattern here to prevent that.
 pub fn decrypt(mut ciphertext: Secret, key: &[u8]) -> Option<Secret> {
+    assert!(!ciphertext.is_empty() && ciphertext.len() >= aead::NONCE_LEN);  // fail fast
     let aead_key = aead::RandomizedNonceKey::new(&aead::AES_256_GCM_SIV, key).ok()?;
 
     let nonce = slice_to_nonce(&ciphertext[0..aead::NONCE_LEN]);

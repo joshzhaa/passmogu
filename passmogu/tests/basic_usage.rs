@@ -1,5 +1,6 @@
 use passmogu::{
     encrypt::{decrypt, derive_key, encrypt},
+    generate,
     secret::Secret,
     vault::{Field, Vault},
 };
@@ -21,6 +22,8 @@ fn basic_usage() {
         b"social-media-website.tld",
     ];
     for site in websites {
+        // generate a password
+        let password = generate::rand_base62(40).unwrap();
         // User enters plaintext login form data
         let mut plaintext_form: Vec<Field> = Vec::new();
         plaintext_form.push(Field {
@@ -29,7 +32,7 @@ fn basic_usage() {
         });
         plaintext_form.push(Field {
             prompt: Secret::new((*b"Password").into()),
-            answer: Secret::new((*b"hunter2").into()),
+            answer: password,
         });
         plaintext_form.push(Field {
             prompt: Secret::new((*b"Credit Card Number").into()),
@@ -64,5 +67,20 @@ fn basic_usage() {
     for form_name in vault.form_names() {
         let name = decrypt(Secret::new(form_name.into()), master_key.expose()).unwrap();
         assert!(websites.contains(&name.expose()));
+        println!("\nform: {}", str::from_utf8(name.expose()).unwrap());
+        let form = &vault[form_name];
+        for field in form {
+            let prompt = decrypt(field.prompt.clone(), master_key.expose()).unwrap();
+            let answer = decrypt(field.answer.clone(), master_key.expose()).unwrap();
+            assert_ne!(prompt, answer);
+            println!(
+                "{} {}",
+                str::from_utf8(prompt.expose()).unwrap(),
+                str::from_utf8(answer.expose()).unwrap()
+            );
+        }
     }
+
+    // TODO: implement serialization
+    // TODO: implement checking for the actual contents of a vault
 }
