@@ -204,6 +204,10 @@ mod tests {
         assert_eq!(vault.len(), 1);
         assert_eq!(vault.get(b"form name that wasn't inserted"), None);
 
+        for form_name in vault.form_names() {
+            assert_eq!(form_name, b"asdf");
+        }
+
         let form = vault.get(b"asdf").unwrap();
         for field in form {
             assert!(field.prompt == generic_username.prompt || field.prompt == bad_password.prompt);

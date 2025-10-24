@@ -51,6 +51,8 @@ pub fn encrypt(mut plaintext: Secret, key: &[u8]) -> Option<Secret> {
 }
 
 /// Decrypts ciphertext into plaintext.
+/// If you decrypt plaintext, there's a good chance of panic at runtime.
+/// TODO: determine whetehr we can use type state pattern here to prevent that.
 pub fn decrypt(mut ciphertext: Secret, key: &[u8]) -> Option<Secret> {
     let aead_key = aead::RandomizedNonceKey::new(&aead::AES_256_GCM_SIV, key).ok()?;
 
@@ -87,6 +89,7 @@ mod tests {
         // encrypt and decrypt with key
         let message =
             Secret::new((*b"I set my ATM card's number to '0001' because I'm number one!").into());
+
         println!("message = {}", str::from_utf8(message.expose()).unwrap());
         let ciphertext = encrypt(message.clone(), key.expose()).unwrap();
         println!("ciphertext = {ciphertext:?}");

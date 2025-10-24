@@ -1,5 +1,5 @@
 use passmogu::{
-    encrypt::derive_key,
+    encrypt::{decrypt, derive_key, encrypt},
     secret::Secret,
     vault::{Field, Vault},
 };
@@ -13,49 +13,56 @@ fn basic_usage() {
     let master_key = derive_key(master_password.expose(), salt);
     drop(master_password);
 
-    // User saves login form data
-    let mut form: Vec<Field> = Vec::new();
-    form.push(Field {
-        prompt: Secret::new((*b"Username").into()),
-        answer: Secret::new((*b"AzureDiamond").into()),
-    });
-    form.push(Field {
-        prompt: Secret::new((*b"Password").into()),
-        answer: Secret::new((*b"hunter2").into()),
-    });
-    form.push(Field {
-        prompt: Secret::new((*b"Credit Card Number").into()),
-        answer: Secret::new((*b"5555555555555555").into()),
-    });
-    form.push(Field {
-        prompt: Secret::new((*b"Social Security Number").into()),
-        answer: Secret::new((*b"5555555555").into()),
-    });
-    form.push(Field {
-        prompt: Secret::new((*b"What's your mother's maiden name?").into()),
-        answer: Secret::new((*b"Your mom!").into()),
-    });
-
-    // Save first vault
     let mut vault = Vault::new();
-    vault.insert(b"your-bank", form.clone().into_boxed_slice());
-    vault.insert(b"the-irs", form.clone().into_boxed_slice());
-    vault.insert(
-        b"your-social-media-website-1",
-        form.clone().into_boxed_slice(),
-    );
-    vault.insert(
-        b"your-social-media-website-2",
-        form.clone().into_boxed_slice(),
-    );
-    vault.insert(
-        b"tenth-airline-website-you-have.points-for",
-        form.clone().into_boxed_slice(),
-    );
-    vault.insert(
-        b"tenth-hotel-website-you-have.points-for",
-        form.clone().into_boxed_slice(),
-    );
-    // don't actually dump plaintext passwords
-    println!("{}", str::from_utf8(&vault.dump()).unwrap());
+    let websites: [&[u8]; 4] = [
+        b"your-bank.tld",
+        b"the-irs.tld",
+        b"the-tenth-airline-website-you-sign-up-for-to-get-points.tld",
+        b"social-media-website.tld",
+    ];
+    for site in websites {
+        // User enters plaintext login form data
+        let mut plaintext_form: Vec<Field> = Vec::new();
+        plaintext_form.push(Field {
+            prompt: Secret::new((*b"Username").into()),
+            answer: Secret::new((*b"AzureDiamond").into()),
+        });
+        plaintext_form.push(Field {
+            prompt: Secret::new((*b"Password").into()),
+            answer: Secret::new((*b"hunter2").into()),
+        });
+        plaintext_form.push(Field {
+            prompt: Secret::new((*b"Credit Card Number").into()),
+            answer: Secret::new((*b"5555555555555555").into()),
+        });
+        plaintext_form.push(Field {
+            prompt: Secret::new((*b"Social Security Number").into()),
+            answer: Secret::new((*b"5555555555").into()),
+        });
+        plaintext_form.push(Field {
+            prompt: Secret::new((*b"What's your mother's maiden name?").into()),
+            answer: Secret::new((*b"Your mom!").into()),
+        });
+
+        // Encrypt form data
+        let mut encrypted_form: Vec<Field> = Vec::new();
+        for form in plaintext_form {
+            let prompt = encrypt(form.prompt, master_key.expose()).unwrap();
+            let answer = encrypt(form.answer, master_key.expose()).unwrap();
+
+            encrypted_form.push(Field { prompt, answer });
+        }
+        let form_name = Secret::new(site.into());
+
+        // Save form into vault
+        vault.insert(
+            encrypt(form_name, master_key.expose()).unwrap().expose(),
+            encrypted_form.into_boxed_slice(),
+        );
+    }
+
+    for form_name in vault.form_names() {
+        let name = decrypt(Secret::new(form_name.into()), master_key.expose()).unwrap();
+        assert!(websites.contains(&name.expose()));
+    }
 }
