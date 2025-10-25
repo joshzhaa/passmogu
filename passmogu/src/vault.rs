@@ -1,3 +1,4 @@
+use crate::hex::Hex;
 use crate::secret::Secret;
 use std::collections::HashMap;
 use std::ops::Index;
@@ -17,7 +18,7 @@ pub type Form = Box<[Field]>;
 
 /// Vault maps form_name -> form and mostly mirrors a subset of HashMap's API.
 /// It's serializable to and from tsv. The format is "form_name\tprompt1\tanswer1\tprompt2\tanswer2\n".
-/// The empty Vault is "" (not "\n"). Because of the tsv format, "\t" is disallowed in all fields.
+/// The empty Vault is "" (not "\n"). Because of the tsv format, strings are hex encoded to avoid '\t'.
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct Vault(HashMap<Box<[u8]>, Form>); // memory protections for form_name are not as strong.
 
@@ -31,14 +32,13 @@ impl Vault {
     pub fn dump(&self) -> Box<[u8]> {
         // Could also parse twice to allocate the right size, then to populate, but it's easier this way.
         let mut table: Vec<u8> = Vec::new();
-        // TODO: implement hex encoding here
         for (name, form) in &self.0 {
-            table.extend(name);
+            table.extend(Hex::encode(name).as_slice());
             for field in form.iter() {
                 table.push(b'\t');
-                table.extend(field.prompt.expose());
+                table.extend(Hex::encode(field.prompt.expose()).as_slice());
                 table.push(b'\t');
-                table.extend(field.answer.expose());
+                table.extend(Hex::encode(field.answer.expose()).as_slice());
             }
             table.push(b'\n');
         }
@@ -56,14 +56,14 @@ impl Vault {
             while let Some(prompt) = i.next() {
                 let answer = i.next()?; // each prompt must be paired with an answer
                 form.push(Field {
-                    prompt: Secret::new(Box::from(prompt)),
-                    answer: Secret::new(Box::from(answer)),
+                    prompt: Hex::new(prompt)?.decode(),
+                    answer: Hex::new(answer)?.decode(),
                 });
             }
             if name.is_empty() {
                 continue; // permit empty rows but don't add "" as a key to the map
             }
-            vault.insert(name, form.into_boxed_slice());
+            vault.insert(Hex::new(name)?.decode().expose(), form.into_boxed_slice());
         }
         Some(vault)
     }
@@ -149,9 +149,24 @@ mod tests {
 
     #[test]
     fn serialize_basic_vault() {
-        let serialized = b"irc\tusername\tAzureDiamond\tpassword\thunter2\tWho's your best friend?\tCthon98\nother website dot com\tusername\tCthon98\tpassword\t*********\tWho's your best friend?\tAzureDiamond\n";
-        let vault = Vault::load(serialized).unwrap();
-
+        let serialized_raw = b"irc\tusername\tAzureDiamond\tpassword\thunter2\tWho's your best friend?\tCthon98\nother website dot com\tusername\tCthon98\tpassword\t*********\tWho's your best friend?\tAzureDiamond\n";
+        // It needs to be encoded in hex
+        let lines = serialized_raw
+            .split(|byte| *byte == b'\n');
+        let mut serialized_hex = Vec::new();
+        for line in lines {
+            let tokens = line.split(|byte| *byte == b'\t');
+            for token in tokens {
+                serialized_hex.extend(Hex::encode(token).as_slice());
+                serialized_hex.push(b'\t');
+            }
+            serialized_hex.pop();
+            serialized_hex.push(b'\n');
+        }
+        println!("{}", String::from_utf8_lossy(serialized_hex.as_slice()));
+        // load from string
+        let vault = Vault::load(serialized_hex.as_slice()).unwrap();
+        println!("{vault:?}");
         let mut names = vault.form_names();
         for _ in 0..vault.len() {
             let name = names.next().unwrap();
@@ -179,7 +194,7 @@ mod tests {
         assert_eq!(first_form[0].answer, second_form[2].answer);
         assert_eq!(first_form[2].answer, second_form[0].answer);
 
-        assert_eq!(Vault::load(&vault.dump()), Vault::load(serialized));
+        assert_eq!(Vault::load(&vault.dump()), Vault::load(serialized_hex.as_slice()));
     }
 
     #[test]

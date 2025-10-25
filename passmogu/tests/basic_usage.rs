@@ -64,7 +64,11 @@ fn basic_usage() {
         );
     }
 
-    for form_name in vault.form_names() {
+    // Dump vault and load it back
+    let serialized = vault.dump();
+    let loaded = Vault::load(&serialized).unwrap();
+
+    for form_name in loaded.form_names() {
         let name = decrypt(Secret::new(form_name.into()), master_key.expose()).unwrap();
         assert!(websites.contains(&name.expose()));
         println!("\nform: {}", str::from_utf8(name.expose()).unwrap());
@@ -80,7 +84,5 @@ fn basic_usage() {
             );
         }
     }
-
-    // TODO: implement serialization
     // TODO: implement checking for the actual contents of a vault
 }

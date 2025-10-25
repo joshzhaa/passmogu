@@ -8,9 +8,18 @@ pub struct Hex {
 }
 
 impl Hex {
+    pub fn new(bytes: &[u8]) -> Option<Self> {
+        for byte in bytes {
+            if !byte.is_ascii_digit() && !(b'A'..=b'F').contains(byte) {
+                return None
+            }
+        }
+        Some(Self{ str: Secret::new(Box::from(bytes)) })
+    }
+
     /// encode raw bytes into hex string
     /// infallible because all byte sequences can be represented as hex.
-    pub fn encode(bytes: &[u8]) -> Hex {
+    pub fn encode(bytes: &[u8]) -> Self {
         let byte_to_hex = |x: u8| {
             if x < 10 { b'0' + x } else { b'A' + x - 10 }
         };
@@ -24,7 +33,7 @@ impl Hex {
             hex[i + 1] = byte_to_hex(upper);
             i += 2;
         }
-        Hex { str: hex }
+        Self { str: hex }
     }
 
     /// decode hex string into raw bytes.
@@ -48,6 +57,10 @@ impl Hex {
             bytes[i] = (upper << 4) + lower;
         }
         bytes
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self.str.expose()
     }
 }
 
