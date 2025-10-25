@@ -54,7 +54,7 @@ pub fn encrypt(mut plaintext: Secret, key: &[u8]) -> Option<Secret> {
 /// If you decrypt plaintext, there's a good chance of panic at runtime.
 /// TODO: determine whether we can use type state pattern here to prevent that.
 pub fn decrypt(mut ciphertext: Secret, key: &[u8]) -> Option<Secret> {
-    assert!(!ciphertext.is_empty() && ciphertext.len() >= aead::NONCE_LEN);  // fail fast
+    assert!(!ciphertext.is_empty() && ciphertext.len() >= aead::NONCE_LEN); // fail fast
     let aead_key = aead::RandomizedNonceKey::new(&aead::AES_256_GCM_SIV, key).ok()?;
 
     let nonce = slice_to_nonce(&ciphertext[0..aead::NONCE_LEN]);

@@ -151,8 +151,7 @@ mod tests {
     fn serialize_basic_vault() {
         let serialized_raw = b"irc\tusername\tAzureDiamond\tpassword\thunter2\tWho's your best friend?\tCthon98\nother website dot com\tusername\tCthon98\tpassword\t*********\tWho's your best friend?\tAzureDiamond\n";
         // It needs to be encoded in hex
-        let lines = serialized_raw
-            .split(|byte| *byte == b'\n');
+        let lines = serialized_raw.split(|byte| *byte == b'\n');
         let mut serialized_hex = Vec::new();
         for line in lines {
             let tokens = line.split(|byte| *byte == b'\t');
@@ -194,7 +193,10 @@ mod tests {
         assert_eq!(first_form[0].answer, second_form[2].answer);
         assert_eq!(first_form[2].answer, second_form[0].answer);
 
-        assert_eq!(Vault::load(&vault.dump()), Vault::load(serialized_hex.as_slice()));
+        assert_eq!(
+            Vault::load(&vault.dump()),
+            Vault::load(serialized_hex.as_slice())
+        );
     }
 
     #[test]

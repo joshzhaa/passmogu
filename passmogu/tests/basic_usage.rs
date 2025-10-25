@@ -21,31 +21,36 @@ fn basic_usage() {
         b"the-tenth-airline-website-you-sign-up-for-to-get-points.tld",
         b"social-media-website.tld",
     ];
+    let mock_fields = [
+        Field {
+            prompt: Secret::new((*b"Username").into()),
+            answer: Secret::new((*b"AzureDiamond").into()),
+        },
+        Field {
+            prompt: Secret::new((*b"Credit Card Number").into()),
+            answer: Secret::new((*b"5555555555555555").into()),
+        },
+        Field {
+            prompt: Secret::new((*b"Social Security Number").into()),
+            answer: Secret::new((*b"5555555555").into()),
+        },
+        Field {
+            prompt: Secret::new((*b"What's your mother's maiden name?").into()),
+            answer: Secret::new((*b"Your mom!").into()),
+        },
+    ];
     for site in websites {
         // generate a password
         let password = generate::rand_base62(40).unwrap();
         // User enters plaintext login form data
         let mut plaintext_form: Vec<Field> = Vec::new();
         plaintext_form.push(Field {
-            prompt: Secret::new((*b"Username").into()),
-            answer: Secret::new((*b"AzureDiamond").into()),
-        });
-        plaintext_form.push(Field {
             prompt: Secret::new((*b"Password").into()),
             answer: password,
         });
-        plaintext_form.push(Field {
-            prompt: Secret::new((*b"Credit Card Number").into()),
-            answer: Secret::new((*b"5555555555555555").into()),
-        });
-        plaintext_form.push(Field {
-            prompt: Secret::new((*b"Social Security Number").into()),
-            answer: Secret::new((*b"5555555555").into()),
-        });
-        plaintext_form.push(Field {
-            prompt: Secret::new((*b"What's your mother's maiden name?").into()),
-            answer: Secret::new((*b"Your mom!").into()),
-        });
+        for field in &mock_fields {
+            plaintext_form.push(field.clone());
+        }
 
         // Encrypt form data
         let mut encrypted_form: Vec<Field> = Vec::new();
@@ -82,7 +87,10 @@ fn basic_usage() {
                 str::from_utf8(prompt.expose()).unwrap(),
                 str::from_utf8(answer.expose()).unwrap()
             );
+            // we randomly generated passwords, so we don't know what they are
+            if prompt.expose() != b"Password" {
+                assert!(mock_fields.contains(&Field { prompt, answer }));
+            }
         }
     }
-    // TODO: implement checking for the actual contents of a vault
 }

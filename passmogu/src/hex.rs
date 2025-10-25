@@ -11,10 +11,12 @@ impl Hex {
     pub fn new(bytes: &[u8]) -> Option<Self> {
         for byte in bytes {
             if !byte.is_ascii_digit() && !(b'A'..=b'F').contains(byte) {
-                return None
+                return None;
             }
         }
-        Some(Self{ str: Secret::new(Box::from(bytes)) })
+        Some(Self {
+            str: Secret::new(Box::from(bytes)),
+        })
     }
 
     /// encode raw bytes into hex string
