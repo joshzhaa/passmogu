@@ -3,7 +3,7 @@ use std::io;
 #[derive(Debug)]
 pub(crate) enum Error {
     IOError,
-    UnlockError,
+    // UnlockError,
 }
 
 impl From<io::Error> for Error {
@@ -11,4 +11,3 @@ impl From<io::Error> for Error {
         Error::IOError
     }
 }
-
