@@ -2,7 +2,7 @@ use std::{
     ops::{Index, IndexMut},
     slice::SliceIndex,
 };
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Secret zeroizes the heap allocated u8 slice when dropped. We're only supporting ASCII,
 /// and we want to prohibit reallocations. However, it should be safe to use Vec<Secret> b/c
@@ -41,6 +41,10 @@ impl Secret {
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
+
+    pub fn zeroize(&mut self) {
+        self.data.zeroize();
+    }
 }
 
 impl<I: SliceIndex<[u8]>> Index<I> for Secret {
@@ -57,5 +61,23 @@ impl<I: SliceIndex<[u8]>> IndexMut<I> for Secret {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         &mut self.data[index]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn secret_is_zero() {
+        let mut buffer = Secret::zero(32);
+
+        for (i, byte) in b"this is my password".into_iter().enumerate() {
+            buffer[i] = *byte;
+        }
+        let zero = Secret::zero(32);
+        assert_ne!(buffer, zero);
+        buffer.zeroize();
+        assert_eq!(buffer, zero);
     }
 }

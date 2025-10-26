@@ -3,12 +3,12 @@ use crate::secret::Secret;
 // Valid hex string with invariants:
 // 1. len() % 2 == 0
 // 2. Hex[i].is_ascii_digit() || (b'A'..=b'F').contains(&Hex[i])
-pub struct Hex {
+pub(crate) struct Hex {
     str: Secret,
 }
 
 impl Hex {
-    pub fn new(bytes: &[u8]) -> Option<Self> {
+    pub(crate) fn new(bytes: &[u8]) -> Option<Self> {
         for byte in bytes {
             if !byte.is_ascii_digit() && !(b'A'..=b'F').contains(byte) {
                 return None;
@@ -21,7 +21,7 @@ impl Hex {
 
     /// encode raw bytes into hex string
     /// infallible because all byte sequences can be represented as hex.
-    pub fn encode(bytes: &[u8]) -> Self {
+    pub(crate) fn encode(bytes: &[u8]) -> Self {
         let byte_to_hex = |x: u8| {
             if x < 10 { b'0' + x } else { b'A' + x - 10 }
         };
@@ -40,7 +40,7 @@ impl Hex {
 
     /// decode hex string into raw bytes.
     /// asserts check invariants of Hex struct.
-    pub fn decode(&self) -> Secret {
+    pub(crate) fn decode(&self) -> Secret {
         debug_assert_eq!(self.str.len() % 2, 0);
 
         let hex_to_byte = |x: u8| {
@@ -61,7 +61,7 @@ impl Hex {
         bytes
     }
 
-    pub fn as_slice(&self) -> &[u8] {
+    pub(crate) fn as_slice(&self) -> &[u8] {
         self.str.expose()
     }
 }
